@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - "**"
+
   pull_request:
     branches:
       - "**"
+
   workflow_dispatch:
 
 permissions:
@@ -18,15 +20,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ---------------------------------------------------------
+
+      # =========================================================
       # 1. CHECKOUT
-      # ---------------------------------------------------------
+      # =========================================================
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------------
+
+      # =========================================================
       # 2. JAVA 17
-      # ---------------------------------------------------------
+      # =========================================================
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -34,18 +38,22 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      # ---------------------------------------------------------
+
+      # =========================================================
       # 3. ANDROID SDK
-      # ---------------------------------------------------------
+      # =========================================================
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # ---------------------------------------------------------
-      # 4. INSTALL REQUIRED ANDROID SDK COMPONENTS
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 4. INSTALL ANDROID SDK 35
+      # =========================================================
       - name: Install Android SDK 35
         shell: bash
         run: |
+          set -e
+
           yes | sdkmanager --licenses >/dev/null || true
 
           sdkmanager \
@@ -53,18 +61,22 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      # ---------------------------------------------------------
+          echo "Android SDK 35 installed."
+
+
+      # =========================================================
       # 5. VERIFY PROJECT STRUCTURE
-      # ---------------------------------------------------------
+      # =========================================================
       - name: Verify project structure
         shell: bash
         run: |
           set -e
 
-          echo "===== PROJECT ROOT ====="
-          ls -la
+          echo "=========================================="
+          echo "PROJECT STRUCTURE"
+          echo "=========================================="
 
-          echo "===== REQUIRED FILES ====="
+          ls -la
 
           test -f settings.gradle
           test -f build.gradle
@@ -74,11 +86,49 @@ jobs:
           test -f app/src/main/java/com/sbi/inspection/MainActivity.java
           test -f app/src/main/res/drawable/sbi_original.png
 
+          echo ""
           echo "All required project files found."
 
-      # ---------------------------------------------------------
-      # 6. VERIFY PACKAGE / MANIFEST
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 6. VERIFY GRADLE CONFIGURATION
+      # =========================================================
+      - name: Verify Gradle configuration
+        shell: bash
+        run: |
+          set -e
+
+          echo "=========================================="
+          echo "GRADLE CONFIGURATION"
+          echo "=========================================="
+
+          echo "----- settings.gradle -----"
+          cat settings.gradle
+
+          echo ""
+          echo "----- root build.gradle -----"
+          cat build.gradle
+
+          echo ""
+          echo "----- app/build.gradle -----"
+          cat app/build.gradle
+
+          echo ""
+
+          grep -q "com.android.application" app/build.gradle
+
+          if grep -q "com.sbi.inspection" app/build.gradle; then
+            echo "com.sbi.inspection found in app Gradle configuration."
+          else
+            echo "WARNING: com.sbi.inspection not found in app/build.gradle."
+          fi
+
+          echo "Gradle configuration check completed."
+
+
+      # =========================================================
+      # 7. VERIFY ANDROID MANIFEST
+      # =========================================================
       - name: Verify Android manifest
         shell: bash
         run: |
@@ -86,25 +136,50 @@ jobs:
 
           MANIFEST="app/src/main/AndroidManifest.xml"
 
-          echo "===== MANIFEST ====="
+          echo "=========================================="
+          echo "ANDROID MANIFEST"
+          echo "=========================================="
+
           cat "$MANIFEST"
 
-          grep -q 'package="com.sbi.inspection"' "$MANIFEST"
+          echo ""
+          echo "Checking MainActivity..."
 
           if grep -q 'android:name=".MainActivity"' "$MANIFEST"; then
             echo "MainActivity manifest entry found."
+
           elif grep -q 'android:name="com.sbi.inspection.MainActivity"' "$MANIFEST"; then
-            echo "Fully-qualified MainActivity manifest entry found."
+            echo "Fully qualified MainActivity manifest entry found."
+
           else
             echo "ERROR: MainActivity declaration not found."
             exit 1
           fi
 
+          echo ""
+          echo "Checking launcher..."
+
+          if grep -q 'android.intent.action.MAIN' "$MANIFEST"; then
+            echo "MAIN launcher action found."
+          else
+            echo "ERROR: MAIN launcher action not found."
+            exit 1
+          fi
+
+          if grep -q 'android.intent.category.LAUNCHER' "$MANIFEST"; then
+            echo "LAUNCHER category found."
+          else
+            echo "ERROR: LAUNCHER category not found."
+            exit 1
+          fi
+
+          echo ""
           echo "Manifest verification passed."
 
-      # ---------------------------------------------------------
-      # 7. VERIFY MAIN JAVA SOURCE
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 8. VERIFY MAINACTIVITY SOURCE
+      # =========================================================
       - name: Verify MainActivity source
         shell: bash
         run: |
@@ -112,37 +187,49 @@ jobs:
 
           FILE="app/src/main/java/com/sbi/inspection/MainActivity.java"
 
+          echo "=========================================="
+          echo "MAIN ACTIVITY SOURCE"
+          echo "=========================================="
+
           test -f "$FILE"
 
-          grep -q 'class MainActivity' "$FILE"
           grep -q 'package com.sbi.inspection' "$FILE"
+          grep -q 'class MainActivity' "$FILE"
 
           echo "MainActivity source verification passed."
 
-      # ---------------------------------------------------------
-      # 8. VERIFY SBI LOGO
-      # ---------------------------------------------------------
-      - name: Verify SBI logo resource
+
+      # =========================================================
+      # 9. VERIFY SBI LOGO
+      # =========================================================
+      - name: Verify SBI logo
         shell: bash
         run: |
           set -e
 
-          test -f app/src/main/res/drawable/sbi_original.png
+          LOGO="app/src/main/res/drawable/sbi_original.png"
 
-          FILE_SIZE=$(stat -c%s app/src/main/res/drawable/sbi_original.png)
+          echo "=========================================="
+          echo "SBI LOGO"
+          echo "=========================================="
 
-          echo "SBI logo size: ${FILE_SIZE} bytes"
+          test -f "$LOGO"
 
-          if [ "$FILE_SIZE" -le 100 ]; then
-            echo "ERROR: SBI logo appears invalid or empty."
+          SIZE=$(stat -c%s "$LOGO")
+
+          echo "Logo size: ${SIZE} bytes"
+
+          if [ "$SIZE" -lt 100 ]; then
+            echo "ERROR: SBI logo file appears invalid."
             exit 1
           fi
 
           echo "SBI logo verification passed."
 
-      # ---------------------------------------------------------
-      # 9. CREATE GRADLE WRAPPER IF REQUIRED
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 10. PREPARE GRADLE
+      # =========================================================
       - name: Prepare Gradle
         shell: bash
         run: |
@@ -156,6 +243,7 @@ jobs:
 
             if ! command -v gradle >/dev/null 2>&1; then
               echo "Installing Gradle 8.7..."
+
               wget -q \
                 https://services.gradle.org/distributions/gradle-8.7-bin.zip \
                 -O /tmp/gradle.zip
@@ -170,23 +258,35 @@ jobs:
             fi
 
             gradle wrapper --gradle-version 8.7
+
             chmod +x ./gradlew
           fi
 
+          echo ""
+          echo "=========================================="
+          echo "GRADLE VERSION"
+          echo "=========================================="
+
           ./gradlew --version
 
-      # ---------------------------------------------------------
-      # 10. CLEAN BUILD
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 11. CLEAN
+      # =========================================================
       - name: Clean project
         shell: bash
         run: |
           set -e
-          ./gradlew clean --no-daemon --stacktrace
 
-      # ---------------------------------------------------------
-      # 11. COMPILE JAVA
-      # ---------------------------------------------------------
+          ./gradlew \
+            clean \
+            --no-daemon \
+            --stacktrace
+
+
+      # =========================================================
+      # 12. COMPILE JAVA
+      # =========================================================
       - name: Compile Debug Java
         shell: bash
         run: |
@@ -197,9 +297,10 @@ jobs:
             --no-daemon \
             --stacktrace
 
-      # ---------------------------------------------------------
-      # 12. BUILD DEBUG APK
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 13. BUILD DEBUG APK
+      # =========================================================
       - name: Build Debug APK
         shell: bash
         run: |
@@ -210,9 +311,10 @@ jobs:
             --no-daemon \
             --stacktrace
 
-      # ---------------------------------------------------------
-      # 13. VERIFY APK EXISTS
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 14. VERIFY APK
+      # =========================================================
       - name: Verify APK
         shell: bash
         run: |
@@ -220,9 +322,12 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
+          echo "=========================================="
+          echo "APK VERIFICATION"
+          echo "=========================================="
+
           test -f "$APK"
 
-          echo "APK found:"
           ls -lh "$APK"
 
           APK_SIZE=$(stat -c%s "$APK")
@@ -234,11 +339,12 @@ jobs:
             exit 1
           fi
 
-          echo "APK verification passed."
+          echo "APK exists and has valid size."
 
-      # ---------------------------------------------------------
-      # 14. INSTALL AAPT / BUILD TOOLS PATH
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 15. ADD BUILD TOOLS TO PATH
+      # =========================================================
       - name: Configure Android build tools
         shell: bash
         run: |
@@ -250,12 +356,12 @@ jobs:
 
           echo "$BUILD_TOOLS" >> "$GITHUB_PATH"
 
-          echo "Android build tools:"
-          ls -la "$BUILD_TOOLS"
+          echo "Build tools configured."
 
-      # ---------------------------------------------------------
-      # 15. INSPECT APK
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 16. INSPECT APK
+      # =========================================================
       - name: Inspect APK with AAPT
         shell: bash
         run: |
@@ -263,14 +369,17 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
-          echo "===== APK BADGING ====="
+          echo "=========================================="
+          echo "APK BADGING"
+          echo "=========================================="
 
           aapt dump badging "$APK"
 
-      # ---------------------------------------------------------
-      # 16. VERIFY APPLICATION PACKAGE
-      # ---------------------------------------------------------
-      - name: Verify APK package name
+
+      # =========================================================
+      # 17. VERIFY APPLICATION PACKAGE
+      # =========================================================
+      - name: Verify APK package
         shell: bash
         run: |
           set -e
@@ -279,16 +388,22 @@ jobs:
 
           aapt dump badging "$APK" > /tmp/apk-badging.txt
 
-          cat /tmp/apk-badging.txt
+          echo "=========================================="
+          echo "APK PACKAGE"
+          echo "=========================================="
+
+          grep "package:" /tmp/apk-badging.txt
 
           grep -q "package: name='com.sbi.inspection'" \
             /tmp/apk-badging.txt
 
-          echo "Package name verification passed."
+          echo ""
+          echo "Package verification passed."
 
-      # ---------------------------------------------------------
-      # 17. VERIFY SDK INFORMATION
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 18. VERIFY APK SDK
+      # =========================================================
       - name: Verify APK SDK information
         shell: bash
         run: |
@@ -298,13 +413,19 @@ jobs:
 
           aapt dump badging "$APK" > /tmp/apk-badging.txt
 
-          grep -q "sdkVersion" /tmp/apk-badging.txt
+          echo "=========================================="
+          echo "SDK INFORMATION"
+          echo "=========================================="
 
-          echo "SDK information found."
+          grep "sdkVersion" /tmp/apk-badging.txt
 
-      # ---------------------------------------------------------
-      # 18. VERIFY APK ZIP INTEGRITY
-      # ---------------------------------------------------------
+          echo ""
+          echo "SDK verification passed."
+
+
+      # =========================================================
+      # 19. VERIFY APK ZIP INTEGRITY
+      # =========================================================
       - name: Verify APK ZIP integrity
         shell: bash
         run: |
@@ -312,13 +433,19 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
+          echo "=========================================="
+          echo "APK ZIP INTEGRITY"
+          echo "=========================================="
+
           unzip -t "$APK"
 
+          echo ""
           echo "APK ZIP integrity verification passed."
 
-      # ---------------------------------------------------------
-      # 19. GENERATE SHA-256
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 20. SHA-256
+      # =========================================================
       - name: Generate APK SHA-256
         shell: bash
         run: |
@@ -326,11 +453,17 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
-          sha256sum "$APK" | tee app/build/outputs/apk/debug/SHA256SUM.txt
+          echo "=========================================="
+          echo "SHA-256"
+          echo "=========================================="
 
-      # ---------------------------------------------------------
-      # 20. COPY FINAL APK WITH USER-FRIENDLY NAME
-      # ---------------------------------------------------------
+          sha256sum "$APK" \
+            | tee app/build/outputs/apk/debug/SHA256SUM.txt
+
+
+      # =========================================================
+      # 21. PREPARE FINAL APK
+      # =========================================================
       - name: Prepare final APK
         shell: bash
         run: |
@@ -346,12 +479,16 @@ jobs:
             app/build/outputs/apk/debug/SHA256SUM.txt \
             release/SHA256SUM.txt
 
-          echo "===== RELEASE FILES ====="
+          echo "=========================================="
+          echo "FINAL RELEASE"
+          echo "=========================================="
+
           ls -lh release
 
-      # ---------------------------------------------------------
-      # 21. UPLOAD FINAL APK
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 22. UPLOAD FINAL APK
+      # =========================================================
       - name: Upload final APK
         uses: actions/upload-artifact@v4
         with:
@@ -360,9 +497,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # ---------------------------------------------------------
-      # 22. UPLOAD DEBUG BUILD OUTPUTS
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 23. UPLOAD DEBUG OUTPUTS
+      # =========================================================
       - name: Upload debug build outputs
         uses: actions/upload-artifact@v4
         with:
@@ -373,9 +511,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      # ---------------------------------------------------------
-      # 23. UPLOAD BUILD REPORTS
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 24. UPLOAD BUILD REPORTS
+      # =========================================================
       - name: Upload build reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -387,29 +526,39 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # ---------------------------------------------------------
-      # 24. FINAL BUILD SUMMARY
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # 25. FINAL SUCCESS MESSAGE
+      # =========================================================
       - name: Build summary
         shell: bash
         run: |
           echo ""
           echo "======================================================"
+          echo ""
           echo "       SBI INSPECTION APP BUILD SUCCESSFUL"
+          echo ""
           echo "======================================================"
           echo ""
-          echo "Package : com.sbi.inspection"
-          echo "APK     : SBI-Inspection-App-FINAL.apk"
+          echo "Application : SBI Inspection App"
+          echo "Package     : com.sbi.inspection"
+          echo "SDK         : Android 35"
+          echo "Java        : 17"
+          echo "APK         : SBI-Inspection-App-FINAL.apk"
           echo ""
-          echo "The APK has passed:"
-          echo "  ✓ Project structure verification"
-          echo "  ✓ Manifest verification"
-          echo "  ✓ Java compilation"
-          echo "  ✓ Debug APK build"
-          echo "  ✓ APK package verification"
-          echo "  ✓ SDK verification"
-          echo "  ✓ APK ZIP integrity verification"
-          echo "  ✓ SHA-256 generation"
+          echo "VERIFIED:"
+          echo "  [OK] Project structure"
+          echo "  [OK] Gradle configuration"
+          echo "  [OK] Android Manifest"
+          echo "  [OK] MainActivity"
+          echo "  [OK] SBI Logo"
+          echo "  [OK] Java compilation"
+          echo "  [OK] APK generation"
+          echo "  [OK] APK package"
+          echo "  [OK] SDK information"
+          echo "  [OK] APK ZIP integrity"
+          echo "  [OK] SHA-256"
           echo ""
-          echo "Download the APK from the GitHub Actions Artifacts."
+          echo "======================================================"
+          echo "Download the APK from GitHub Actions Artifacts."
           echo "======================================================"

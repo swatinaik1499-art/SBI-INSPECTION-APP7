@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="72dp"
+    android:height="72dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
+    <!-- SBI's blue circular emblem with the characteristic white keyhole mark. -->
+    <path
+        android:fillColor="#12A8E0"
+        android:pathData="M36,3A33,33 0,1 0,36 69A33,33 0,1 0,36 3" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,24A8,8 0,1 0,36 40A8,8 0,1 0,36 24M32.5,37h7L41,51H31z" />
+</vector>

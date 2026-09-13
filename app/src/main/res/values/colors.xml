@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="sbi_blue">#003A70</color>
+    <color name="sbi_dark">#002855</color>
+    <color name="sbi_dark_blue">#002855</color>
+    <color name="sbi_light_blue">#EAF3FA</color>
+    <color name="sbi_bg">#F4F7FA</color>
+    <color name="sbi_text">#17202A</color>
+    <color name="sbi_muted">#657482</color>
+    <color name="sbi_green">#138A52</color>
+    <color name="sbi_red">#B3261E</color>
+    <color name="sbi_border">#D8E0E7</color>
+    <color name="sbi_gold">#C99A2E</color>
+</resources>
